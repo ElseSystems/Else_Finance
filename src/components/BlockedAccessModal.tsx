@@ -32,6 +32,15 @@ export function BlockedAccessModal({
   };
 
   const handlePayment = async (method: 'pix' | 'credit_card' | 'boleto') => {
+    if (!amountDue || amountDue <= 0) {
+      toast({
+        title: 'Erro',
+        description: 'Valor de pagamento inválido. Entre em contato com o administrador.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     setPaymentMethod(method);
 

@@ -282,8 +282,11 @@ const handler = async (req: Request): Promise<Response> => {
           payer_email,
         } = body;
 
-        if (!amount || !description) {
-          throw new Error("amount e description são obrigatórios");
+        if (!amount || amount <= 0) {
+          throw new Error("amount é obrigatório e deve ser maior que zero");
+        }
+        if (!description) {
+          throw new Error("description é obrigatório");
         }
 
         // Create a checkout preference to allow the user to pay
