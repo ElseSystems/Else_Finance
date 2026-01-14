@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Loader2, Pencil, Calendar, Building2, CreditCard, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -356,90 +356,91 @@ export function SubscriptionsManager() {
         )}
       </div>
 
-      {isDialogOpen && (
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Editar Assinatura</DialogTitle>
-            </DialogHeader>
-            
-            {editingSubscription && (
-              <div className="space-y-4 py-4">
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="font-medium text-foreground">{editingSubscription.tenant_name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Plano atual: {editingSubscription.plan_name}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={editForm.status}
-                    onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Ativo</SelectItem>
-                      <SelectItem value="trial">Trial</SelectItem>
-                      <SelectItem value="expired">Expirado</SelectItem>
-                      <SelectItem value="cancelled">Cancelado</SelectItem>
-                      <SelectItem value="blocked">Bloqueado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {(editForm.status === 'blocked' || editForm.status === 'cancelled') && (
-                    <p className="text-xs text-destructive flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      Isso bloqueará o acesso do usuário ao sistema
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="end_date">Data de Vencimento</Label>
-                  <Input
-                    id="end_date"
-                    type="date"
-                    value={editForm.end_date}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, end_date: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="plan">Plano</Label>
-                  <Select
-                    value={editForm.plan_id}
-                    onValueChange={(value) => setEditForm(prev => ({ ...prev, plan_id: value }))}
-                  >
-                    <SelectTrigger id="plan">
-                      <SelectValue placeholder="Selecionar plano" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plans.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} - R$ {plan.price.toFixed(2)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Assinatura</DialogTitle>
+            <DialogDescription>
+              Altere o status, plano ou data de vencimento da assinatura
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editingSubscription && (
+            <div className="space-y-4 py-4">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="font-medium text-foreground">{editingSubscription.tenant_name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Plano atual: {editingSubscription.plan_name}
+                </p>
               </div>
-            )}
 
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={closeDialog} disabled={saving}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Salvar Alterações
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="trial">Trial</SelectItem>
+                    <SelectItem value="expired">Expirado</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                    <SelectItem value="blocked">Bloqueado</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(editForm.status === 'blocked' || editForm.status === 'cancelled') && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    Isso bloqueará o acesso do usuário ao sistema
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="end_date">Data de Vencimento</Label>
+                <Input
+                  id="end_date"
+                  type="date"
+                  value={editForm.end_date}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, end_date: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="plan">Plano</Label>
+                <Select
+                  value={editForm.plan_id}
+                  onValueChange={(value) => setEditForm(prev => ({ ...prev, plan_id: value }))}
+                >
+                  <SelectTrigger id="plan">
+                    <SelectValue placeholder="Selecionar plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {plans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {plan.name} - R$ {plan.price.toFixed(2)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closeDialog} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
