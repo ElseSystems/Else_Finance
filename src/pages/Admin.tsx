@@ -1,48 +1,53 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { Shield, Users, Building2, ArrowDownUp, Loader2 } from 'lucide-react';
+import { Shield, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { AdminStats } from '@/components/admin/AdminStats';
+import { TenantsTable } from '@/components/admin/TenantsTable';
+import { SubscriptionEditDialog } from '@/components/admin/SubscriptionEditDialog';
 
-interface AdminStats {
+interface AdminStatsData {
   totalUsers: number;
   totalTenants: number;
   totalTransactions: number;
 }
 
-interface UserWithRole {
+interface Plan {
   id: string;
-  email: string;
-  full_name: string | null;
-  tenant_name: string | null;
-  role: string;
+  name: string;
+  price: number;
+  duration_months: number;
+}
+
+interface TenantWithSubscription {
+  id: string;
+  name: string;
+  is_blocked: boolean;
+  plan_id: string | null;
+  plan_name: string | null;
+  status: string | null;
+  end_date: string | null;
+  subscription_id: string | null;
 }
 
 export default function Admin() {
-  const { profile, user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [stats, setStats] = useState<AdminStats>({
+  const [stats, setStats] = useState<AdminStatsData>({
     totalUsers: 0,
     totalTenants: 0,
     totalTransactions: 0,
   });
-  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [tenants, setTenants] = useState<TenantWithSubscription[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingTenant, setEditingTenant] = useState<TenantWithSubscription | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      checkAdminRole();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      fetchAdminData();
-    }
-  }, [isAdmin]);
-
-  const checkAdminRole = async () => {
+  const checkAdminRole = useCallback(async () => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -53,14 +58,15 @@ export default function Admin() {
       .single();
 
     setIsAdmin(!error && data?.role === 'admin');
-  };
+  }, [user]);
 
-  const fetchAdminData = async () => {
+  const fetchAdminData = useCallback(async () => {
     // Get stats
-    const [usersCount, tenantsCount, transactionsCount] = await Promise.all([
+    const [usersCount, tenantsCount, transactionsCount, plansData] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
       supabase.from('tenants').select('id', { count: 'exact', head: true }),
       supabase.from('transactions').select('id', { count: 'exact', head: true }),
+      supabase.from('plans').select('*').eq('is_active', true).order('price'),
     ]);
 
     setStats({
@@ -69,40 +75,118 @@ export default function Admin() {
       totalTransactions: transactionsCount.count || 0,
     });
 
-    // Get users with their roles
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select(`
-        user_id,
-        full_name,
-        email,
-        tenant:tenants(name)
-      `)
-      .limit(20);
+    if (plansData.data) {
+      setPlans(plansData.data);
+    }
 
-    if (profilesData) {
-      const usersWithRoles = await Promise.all(
-        profilesData.map(async (p: any) => {
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', p.user_id)
+    // Get tenants with their subscriptions
+    const { data: tenantsData } = await supabase
+      .from('tenants')
+      .select('id, name, is_blocked')
+      .order('name');
+
+    if (tenantsData) {
+      const tenantsWithSubs = await Promise.all(
+        tenantsData.map(async (t) => {
+          const { data: subData } = await supabase
+            .from('subscriptions')
+            .select(`
+              id,
+              plan_id,
+              status,
+              end_date,
+              plan:plans(name)
+            `)
+            .eq('tenant_id', t.id)
+            .order('end_date', { ascending: false })
+            .limit(1)
             .single();
 
           return {
-            id: p.user_id,
-            email: p.email,
-            full_name: p.full_name,
-            tenant_name: p.tenant?.name || null,
-            role: roleData?.role || 'user',
+            id: t.id,
+            name: t.name,
+            is_blocked: t.is_blocked || false,
+            plan_id: subData?.plan_id || null,
+            plan_name: (subData?.plan as any)?.name || null,
+            status: subData?.status || null,
+            end_date: subData?.end_date || null,
+            subscription_id: subData?.id || null,
           };
         })
       );
 
-      setUsers(usersWithRoles);
+      setTenants(tenantsWithSubs);
     }
 
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      checkAdminRole();
+    }
+  }, [user, checkAdminRole]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchAdminData();
+    }
+  }, [isAdmin, fetchAdminData]);
+
+  const handleEditTenant = (tenant: TenantWithSubscription) => {
+    setEditingTenant(tenant);
+    setDialogOpen(true);
+  };
+
+  const handleSaveSubscription = async (
+    tenantId: string,
+    subscriptionId: string | null,
+    planId: string,
+    endDate: Date,
+    status: string
+  ) => {
+    try {
+      const isBlocked = status === 'blocked';
+      
+      // Update tenant blocked status
+      await supabase
+        .from('tenants')
+        .update({ 
+          is_blocked: isBlocked,
+          blocked_at: isBlocked ? new Date().toISOString() : null,
+          block_reason: isBlocked ? 'Bloqueado pelo administrador' : null
+        })
+        .eq('id', tenantId);
+
+      const subscriptionData = {
+        plan_id: planId,
+        end_date: endDate.toISOString().split('T')[0],
+        status: isBlocked ? 'blocked' : status,
+      };
+
+      if (subscriptionId) {
+        // Update existing subscription
+        await supabase
+          .from('subscriptions')
+          .update(subscriptionData)
+          .eq('id', subscriptionId);
+      } else {
+        // Create new subscription
+        await supabase
+          .from('subscriptions')
+          .insert({
+            ...subscriptionData,
+            tenant_id: tenantId,
+            start_date: new Date().toISOString().split('T')[0],
+          });
+      }
+
+      toast.success('Assinatura atualizada com sucesso!');
+      fetchAdminData();
+    } catch (error) {
+      console.error('Error saving subscription:', error);
+      toast.error('Erro ao salvar assinatura');
+    }
   };
 
   if (authLoading || isAdmin === null) {
@@ -126,93 +210,31 @@ export default function Admin() {
           <Shield className="text-primary" size={32} />
           <h1 className="font-display text-3xl font-bold text-foreground">Painel Admin</h1>
         </div>
-        <p className="text-muted-foreground">Gerencie usuários e visualize estatísticas do sistema</p>
+        <p className="text-muted-foreground">Gerencie assinaturas e visualize estatísticas do sistema</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="stat-card">
-          <div className="flex items-center gap-4">
-            <div className="p-4 rounded-xl bg-primary/10">
-              <Users className="text-primary" size={28} />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total de Usuários</p>
-              <p className="text-3xl font-display font-bold text-foreground">{stats.totalUsers}</p>
-            </div>
-          </div>
-        </div>
+      <AdminStats
+        totalUsers={stats.totalUsers}
+        totalTenants={stats.totalTenants}
+        totalTransactions={stats.totalTransactions}
+      />
 
-        <div className="stat-card">
-          <div className="flex items-center gap-4">
-            <div className="p-4 rounded-xl bg-primary/10">
-              <Building2 className="text-primary" size={28} />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total de Tenants</p>
-              <p className="text-3xl font-display font-bold text-foreground">{stats.totalTenants}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center gap-4">
-            <div className="p-4 rounded-xl bg-primary/10">
-              <ArrowDownUp className="text-primary" size={28} />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total de Transações</p>
-              <p className="text-3xl font-display font-bold text-foreground">{stats.totalTransactions}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Users List */}
       <div className="stat-card">
-        <h3 className="font-display font-semibold text-lg mb-4">Usuários Recentes</h3>
-        
-        {loading ? (
-          <div className="text-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Nome</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">E-mail</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Empresa</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Função</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id} className="border-b border-border/50 hover:bg-muted/30">
-                    <td className="py-3 px-4 font-medium text-foreground">
-                      {user.full_name || 'Sem nome'}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">{user.email}</td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {user.tenant_name || '-'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        user.role === 'admin' 
-                          ? 'bg-primary/10 text-primary' 
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <h3 className="font-display font-semibold text-lg mb-4">Empresas e Assinaturas</h3>
+        <TenantsTable
+          tenants={tenants}
+          loading={loading}
+          onEdit={handleEditTenant}
+        />
       </div>
+
+      <SubscriptionEditDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        tenant={editingTenant}
+        plans={plans}
+        onSave={handleSaveSubscription}
+      />
     </Layout>
   );
 }
