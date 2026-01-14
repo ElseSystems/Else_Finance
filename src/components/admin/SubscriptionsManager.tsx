@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Loader2, Pencil, Calendar, Building2, CreditCard } from 'lucide-react';
+import { Loader2, Pencil, Calendar, Building2, CreditCard, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -33,6 +33,8 @@ export function SubscriptionsManager() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [editForm, setEditForm] = useState({
     status: '',
@@ -47,97 +49,123 @@ export function SubscriptionsManager() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     
-    const [subsResult, plansResult] = await Promise.all([
-      supabase
-        .from('subscriptions')
-        .select(`
-          id,
-          tenant_id,
-          status,
-          start_date,
-          end_date,
-          is_trial,
-          plan_id,
-          tenants!inner(name),
-          plans!inner(name, price)
-        `)
-        .order('end_date', { ascending: true }),
-      supabase.from('plans').select('id, name, price').eq('is_active', true)
-    ]);
+    try {
+      const [subsResult, plansResult] = await Promise.all([
+        supabase
+          .from('subscriptions')
+          .select(`
+            id,
+            tenant_id,
+            status,
+            start_date,
+            end_date,
+            is_trial,
+            plan_id,
+            tenants(name),
+            plans(name, price)
+          `)
+          .order('end_date', { ascending: true }),
+        supabase.from('plans').select('id, name, price').eq('is_active', true)
+      ]);
 
-    if (subsResult.data) {
-      const formatted = subsResult.data.map((s: any) => ({
-        id: s.id,
-        tenant_id: s.tenant_id,
-        tenant_name: s.tenants?.name || 'N/A',
-        plan_name: s.plans?.name || 'N/A',
-        plan_price: s.plans?.price || 0,
-        status: s.status,
-        start_date: s.start_date,
-        end_date: s.end_date,
-        is_trial: s.is_trial,
-        plan_id: s.plan_id
-      }));
-      setSubscriptions(formatted);
-    }
+      if (subsResult.error) {
+        console.error('Erro ao buscar assinaturas:', subsResult.error);
+        setError('Erro ao carregar assinaturas: ' + subsResult.error.message);
+        setLoading(false);
+        return;
+      }
 
-    if (plansResult.data) {
-      setPlans(plansResult.data);
+      if (subsResult.data) {
+        const formatted = subsResult.data.map((s: any) => ({
+          id: s.id,
+          tenant_id: s.tenant_id,
+          tenant_name: s.tenants?.name || 'N/A',
+          plan_name: s.plans?.name || 'N/A',
+          plan_price: Number(s.plans?.price) || 0,
+          status: s.status,
+          start_date: s.start_date,
+          end_date: s.end_date,
+          is_trial: s.is_trial,
+          plan_id: s.plan_id
+        }));
+        setSubscriptions(formatted);
+      }
+
+      if (plansResult.data) {
+        setPlans(plansResult.data.map(p => ({ ...p, price: Number(p.price) })));
+      }
+    } catch (err) {
+      console.error('Erro inesperado:', err);
+      setError('Erro inesperado ao carregar dados');
     }
 
     setLoading(false);
   };
 
   const openEditDialog = (subscription: Subscription) => {
+    console.log('Abrindo edição para:', subscription);
     setEditingSubscription(subscription);
     setEditForm({
       status: subscription.status,
       end_date: subscription.end_date,
       plan_id: subscription.plan_id || ''
     });
+    setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditingSubscription(null);
   };
 
   const handleSave = async () => {
     if (!editingSubscription) return;
     
     setSaving(true);
+    console.log('Salvando alterações:', editForm);
     
-    // Atualiza a assinatura
-    const { error: subError } = await supabase
-      .from('subscriptions')
-      .update({
-        status: editForm.status,
-        end_date: editForm.end_date,
-        ...(editForm.plan_id && { plan_id: editForm.plan_id })
-      })
-      .eq('id', editingSubscription.id);
+    try {
+      // Atualiza a assinatura
+      const { error: subError } = await supabase
+        .from('subscriptions')
+        .update({
+          status: editForm.status,
+          end_date: editForm.end_date,
+          plan_id: editForm.plan_id || editingSubscription.plan_id
+        })
+        .eq('id', editingSubscription.id);
 
-    if (subError) {
-      toast.error('Erro ao atualizar assinatura');
-      console.error(subError);
-      setSaving(false);
-      return;
-    }
+      if (subError) {
+        toast.error('Erro ao atualizar assinatura: ' + subError.message);
+        console.error('Erro subscription update:', subError);
+        setSaving(false);
+        return;
+      }
 
-    // Atualiza o bloqueio do tenant baseado no status
-    const isBlocked = editForm.status === 'blocked' || editForm.status === 'cancelled';
-    const { error: tenantError } = await supabase
-      .from('tenants')
-      .update({
-        is_blocked: isBlocked,
-        blocked_at: isBlocked ? new Date().toISOString() : null,
-        block_reason: isBlocked ? `Status alterado para ${editForm.status}` : null
-      })
-      .eq('id', editingSubscription.tenant_id);
+      // Atualiza o bloqueio do tenant baseado no status
+      const isBlocked = editForm.status === 'blocked' || editForm.status === 'cancelled';
+      const { error: tenantError } = await supabase
+        .from('tenants')
+        .update({
+          is_blocked: isBlocked,
+          blocked_at: isBlocked ? new Date().toISOString() : null,
+          block_reason: isBlocked ? `Status alterado para ${editForm.status}` : null
+        })
+        .eq('id', editingSubscription.tenant_id);
 
-    if (tenantError) {
-      toast.error('Erro ao atualizar status do tenant');
-      console.error(tenantError);
-    } else {
-      toast.success('Assinatura atualizada com sucesso!');
-      setEditingSubscription(null);
-      fetchData();
+      if (tenantError) {
+        toast.error('Erro ao atualizar status do tenant: ' + tenantError.message);
+        console.error('Erro tenant update:', tenantError);
+      } else {
+        toast.success('Assinatura atualizada com sucesso!');
+        closeDialog();
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Erro inesperado ao salvar:', err);
+      toast.error('Erro inesperado ao salvar');
     }
     
     setSaving(false);
@@ -187,6 +215,26 @@ export function SubscriptionsManager() {
         </div>
         <div className="text-center py-8">
           <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground mt-2">Carregando assinaturas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="stat-card">
+        <div className="flex items-center gap-3 mb-4">
+          <CreditCard className="text-primary" size={24} />
+          <h3 className="font-display font-semibold text-lg">Gerenciar Assinaturas</h3>
+        </div>
+        <div className="text-center py-8">
+          <AlertCircle className="w-8 h-8 mx-auto text-destructive mb-2" />
+          <p className="text-sm text-destructive mb-4">{error}</p>
+          <Button variant="outline" size="sm" onClick={fetchData}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Tentar novamente
+          </Button>
         </div>
       </div>
     );
@@ -195,9 +243,15 @@ export function SubscriptionsManager() {
   return (
     <>
       <div className="stat-card">
-        <div className="flex items-center gap-3 mb-4">
-          <CreditCard className="text-primary" size={24} />
-          <h3 className="font-display font-semibold text-lg">Gerenciar Assinaturas</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <CreditCard className="text-primary" size={24} />
+            <h3 className="font-display font-semibold text-lg">Gerenciar Assinaturas</h3>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchData}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
         </div>
 
         <div className="overflow-x-auto">
@@ -262,7 +316,7 @@ export function SubscriptionsManager() {
                   </td>
                   <td className="py-3 px-4">
                     <Button
-                      variant="ghost"
+                      variant="default"
                       size="sm"
                       onClick={() => openEditDialog(sub)}
                       className="gap-1"
@@ -284,8 +338,8 @@ export function SubscriptionsManager() {
         )}
       </div>
 
-      <Dialog open={!!editingSubscription} onOpenChange={() => setEditingSubscription(null)}>
-        <DialogContent>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Editar Assinatura</DialogTitle>
           </DialogHeader>
@@ -300,13 +354,13 @@ export function SubscriptionsManager() {
               </div>
 
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label htmlFor="status">Status</Label>
                 <Select
                   value={editForm.status}
                   onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">Ativo</SelectItem>
@@ -317,15 +371,17 @@ export function SubscriptionsManager() {
                   </SelectContent>
                 </Select>
                 {(editForm.status === 'blocked' || editForm.status === 'cancelled') && (
-                  <p className="text-xs text-destructive">
-                    ⚠️ Isso bloqueará o acesso do usuário ao sistema
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    Isso bloqueará o acesso do usuário ao sistema
                   </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label>Data de Vencimento</Label>
+                <Label htmlFor="end_date">Data de Vencimento</Label>
                 <Input
+                  id="end_date"
                   type="date"
                   value={editForm.end_date}
                   onChange={(e) => setEditForm(prev => ({ ...prev, end_date: e.target.value }))}
@@ -333,12 +389,12 @@ export function SubscriptionsManager() {
               </div>
 
               <div className="space-y-2">
-                <Label>Plano</Label>
+                <Label htmlFor="plan">Plano</Label>
                 <Select
                   value={editForm.plan_id}
                   onValueChange={(value) => setEditForm(prev => ({ ...prev, plan_id: value }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="plan">
                     <SelectValue placeholder="Selecionar plano" />
                   </SelectTrigger>
                   <SelectContent>
@@ -353,13 +409,13 @@ export function SubscriptionsManager() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingSubscription(null)}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closeDialog} disabled={saving}>
               Cancelar
             </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Salvar
+              Salvar Alterações
             </Button>
           </DialogFooter>
         </DialogContent>
