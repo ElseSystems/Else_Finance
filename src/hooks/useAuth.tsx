@@ -10,25 +10,14 @@ interface Profile {
   tenant_id: string | null;
 }
 
-interface TenantAccess {
-  can_access: boolean;
-  block_reason: string | null;
-  is_payment_due: boolean;
-  amount_due: number;
-  subscription_status: string;
-}
-
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  isAdmin: boolean;
-  tenantAccess: TenantAccess | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, planId?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  refreshTenantAccess: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,8 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [tenantAccess, setTenantAccess] = useState<TenantAccess | null>(null);
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -50,34 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (!error && data) {
       setProfile(data);
-      return data;
-    }
-    return null;
-  };
-
-  const checkAdminRole = async (userId: string) => {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .single();
-    
-    setIsAdmin(!!data);
-  };
-
-  const checkTenantAccess = async (tenantId: string) => {
-    const { data, error } = await supabase
-      .rpc('check_tenant_access', { p_tenant_id: tenantId });
-    
-    if (!error && data && data.length > 0) {
-      setTenantAccess(data[0]);
-    }
-  };
-
-  const refreshTenantAccess = async () => {
-    if (profile?.tenant_id) {
-      await checkTenantAccess(profile.tenant_id);
     }
   };
 
@@ -88,31 +47,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          const profileData = await fetchProfile(session.user.id);
-          await checkAdminRole(session.user.id);
-          if (profileData?.tenant_id) {
-            await checkTenantAccess(profileData.tenant_id);
-          }
+          setTimeout(() => fetchProfile(session.user.id), 0);
         } else {
           setProfile(null);
-          setIsAdmin(false);
-          setTenantAccess(null);
         }
         
         setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const profileData = await fetchProfile(session.user.id);
-        await checkAdminRole(session.user.id);
-        if (profileData?.tenant_id) {
-          await checkTenantAccess(profileData.tenant_id);
-        }
+        fetchProfile(session.user.id);
       }
       
       setLoading(false);
@@ -129,14 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, fullName: string, planId?: string) => {
+  const signUp = async (email: string, password: string, fullName: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: fullName,
-          selected_plan_id: planId,
         },
         emailRedirectTo: window.location.origin,
       },
@@ -147,23 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
-    setIsAdmin(false);
-    setTenantAccess(null);
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      profile, 
-      loading, 
-      isAdmin, 
-      tenantAccess, 
-      signIn, 
-      signUp, 
-      signOut,
-      refreshTenantAccess 
-    }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

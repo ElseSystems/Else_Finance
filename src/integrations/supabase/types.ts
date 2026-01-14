@@ -106,158 +106,6 @@ export type Database = {
           },
         ]
       }
-      payment_methods: {
-        Row: {
-          card_brand: string | null
-          card_last_four: string | null
-          created_at: string | null
-          id: string
-          is_default: boolean | null
-          mercadopago_card_id: string | null
-          mercadopago_customer_id: string | null
-          tenant_id: string
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          card_brand?: string | null
-          card_last_four?: string | null
-          created_at?: string | null
-          id?: string
-          is_default?: boolean | null
-          mercadopago_card_id?: string | null
-          mercadopago_customer_id?: string | null
-          tenant_id: string
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          card_brand?: string | null
-          card_last_four?: string | null
-          created_at?: string | null
-          id?: string
-          is_default?: boolean | null
-          mercadopago_card_id?: string | null
-          mercadopago_customer_id?: string | null
-          tenant_id?: string
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_methods_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payments: {
-        Row: {
-          amount: number
-          created_at: string
-          failed_at: string | null
-          fee_amount: number | null
-          id: string
-          invoice_url: string | null
-          mercadopago_payment_id: string | null
-          mercadopago_preference_id: string | null
-          net_amount: number | null
-          paid_at: string | null
-          payment_method: string | null
-          status: string
-          status_detail: string | null
-          subscription_id: string | null
-          tenant_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount?: number
-          created_at?: string
-          failed_at?: string | null
-          fee_amount?: number | null
-          id?: string
-          invoice_url?: string | null
-          mercadopago_payment_id?: string | null
-          mercadopago_preference_id?: string | null
-          net_amount?: number | null
-          paid_at?: string | null
-          payment_method?: string | null
-          status?: string
-          status_detail?: string | null
-          subscription_id?: string | null
-          tenant_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          failed_at?: string | null
-          fee_amount?: number | null
-          id?: string
-          invoice_url?: string | null
-          mercadopago_payment_id?: string | null
-          mercadopago_preference_id?: string | null
-          net_amount?: number | null
-          paid_at?: string | null
-          payment_method?: string | null
-          status?: string
-          status_detail?: string | null
-          subscription_id?: string | null
-          tenant_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payments_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      plans: {
-        Row: {
-          created_at: string
-          description: string | null
-          duration_months: number
-          id: string
-          is_active: boolean | null
-          name: string
-          price: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          duration_months?: number
-          id?: string
-          is_active?: boolean | null
-          name: string
-          price: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          duration_months?: number
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          price?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string
@@ -288,106 +136,25 @@ export type Database = {
         }
         Relationships: []
       }
-      subscriptions: {
-        Row: {
-          amount_due: number | null
-          created_at: string
-          end_date: string
-          id: string
-          is_trial: boolean | null
-          last_payment_date: string | null
-          mercadopago_preapproval_id: string | null
-          mercadopago_subscription_id: string | null
-          notified_expiring: boolean | null
-          payment_method: string | null
-          plan_id: string
-          start_date: string
-          status: string
-          tenant_id: string
-          trial_ends_at: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount_due?: number | null
-          created_at?: string
-          end_date: string
-          id?: string
-          is_trial?: boolean | null
-          last_payment_date?: string | null
-          mercadopago_preapproval_id?: string | null
-          mercadopago_subscription_id?: string | null
-          notified_expiring?: boolean | null
-          payment_method?: string | null
-          plan_id: string
-          start_date?: string
-          status?: string
-          tenant_id: string
-          trial_ends_at?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount_due?: number | null
-          created_at?: string
-          end_date?: string
-          id?: string
-          is_trial?: boolean | null
-          last_payment_date?: string | null
-          mercadopago_preapproval_id?: string | null
-          mercadopago_subscription_id?: string | null
-          notified_expiring?: boolean | null
-          payment_method?: string | null
-          plan_id?: string
-          start_date?: string
-          status?: string
-          tenant_id?: string
-          trial_ends_at?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscriptions_plan_id_fkey"
-            columns: ["plan_id"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscriptions_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tenants: {
         Row: {
-          block_reason: string | null
-          blocked_at: string | null
           created_at: string
           created_by: string | null
           id: string
-          is_blocked: boolean | null
           name: string
           updated_at: string
         }
         Insert: {
-          block_reason?: string | null
-          blocked_at?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
-          is_blocked?: boolean | null
           name: string
           updated_at?: string
         }
         Update: {
-          block_reason?: string | null
-          blocked_at?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
-          is_blocked?: boolean | null
           name?: string
           updated_at?: string
         }
@@ -521,16 +288,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_tenant_access: {
-        Args: { p_tenant_id: string }
-        Returns: {
-          amount_due: number
-          block_reason: string
-          can_access: boolean
-          is_payment_due: boolean
-          subscription_status: string
-        }[]
-      }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

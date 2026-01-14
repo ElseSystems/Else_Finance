@@ -6,14 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight } from 'lucide-react';
-import { PlanSelector } from '@/components/auth/PlanSelector';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -45,7 +43,7 @@ export default function Auth() {
           });
         }
       } else {
-        const { error } = await signUp(email, password, fullName, selectedPlanId || undefined);
+        const { error } = await signUp(email, password, fullName);
         if (error) {
           toast({
             title: 'Erro ao criar conta',
@@ -55,7 +53,7 @@ export default function Auth() {
         } else {
           toast({
             title: 'Conta criada!',
-            description: 'Você já pode fazer login. Seu período de teste de 30 dias começa agora!',
+            description: 'Você já pode fazer login.',
           });
           setIsLogin(true);
         }
@@ -68,7 +66,7 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
+      <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-6">
@@ -87,31 +85,24 @@ export default function Auth() {
             <p className="text-muted-foreground mt-2">
               {isLogin 
                 ? 'Entre para gerenciar suas finanças' 
-                : 'Comece com 30 dias grátis para testar'}
+                : 'Comece a organizar suas finanças hoje'}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Nome completo</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Seu nome"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required={!isLogin}
-                    className="h-12"
-                  />
-                </div>
-                
-                <PlanSelector 
-                  selectedPlanId={selectedPlanId}
-                  onSelect={setSelectedPlanId}
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Nome completo</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  placeholder="Seu nome"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required={!isLogin}
+                  className="h-12"
                 />
-              </>
+              </div>
             )}
             
             <div className="space-y-2">
@@ -189,8 +180,8 @@ export default function Auth() {
 
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-sidebar-accent">
-              <p className="text-2xl font-bold text-sidebar-primary">30</p>
-              <p className="text-sm text-sidebar-foreground/60">Dias Grátis</p>
+              <p className="text-2xl font-bold text-sidebar-primary">100%</p>
+              <p className="text-sm text-sidebar-foreground/60">Responsivo</p>
             </div>
             <div className="p-4 rounded-xl bg-sidebar-accent">
               <p className="text-2xl font-bold text-sidebar-primary">Voz</p>

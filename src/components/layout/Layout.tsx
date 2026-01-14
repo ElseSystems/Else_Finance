@@ -1,18 +1,14 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { VoiceButton } from '@/components/voice/VoiceButton';
-import { BlockedAccessModal } from '@/components/BlockedAccessModal';
-import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/utils';
 
 interface LayoutProps {
   children: ReactNode;
+  isAdmin?: boolean;
 }
 
-export function Layout({ children }: LayoutProps) {
-  const { isAdmin, tenantAccess, refreshTenantAccess } = useAuth();
-
-  const isBlocked = tenantAccess && !tenantAccess.can_access && !isAdmin;
-
+export function Layout({ children, isAdmin = false }: LayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isAdmin={isAdmin} />
@@ -24,16 +20,6 @@ export function Layout({ children }: LayoutProps) {
       </main>
 
       <VoiceButton />
-
-      {isBlocked && (
-        <BlockedAccessModal
-          isOpen={true}
-          blockReason={tenantAccess?.block_reason || null}
-          isPaymentDue={tenantAccess?.is_payment_due || false}
-          amountDue={tenantAccess?.amount_due || 0}
-          onPaymentComplete={refreshTenantAccess}
-        />
-      )}
     </div>
   );
 }
