@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Loader2, Pencil, Calendar, Building2, CreditCard, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -48,10 +48,9 @@ export function SubscriptionsManager() {
   }, []);
 
   const fetchData = async () => {
-    console.log('=== FETCH DATA DEBUG ===');
     setLoading(true);
     setError(null);
-    
+
     try {
       const [subsResult, plansResult] = await Promise.all([
         supabase
@@ -68,11 +67,8 @@ export function SubscriptionsManager() {
             plans(name, price)
           `)
           .order('end_date', { ascending: true }),
-        supabase.from('plans').select('id, name, price').eq('is_active', true)
+        supabase.from('plans').select('id, name, price').eq('is_active', true),
       ]);
-
-      console.log('Subscriptions result:', subsResult);
-      console.log('Plans result:', plansResult);
 
       if (subsResult.error) {
         console.error('Erro ao buscar assinaturas:', subsResult.error);
@@ -82,7 +78,6 @@ export function SubscriptionsManager() {
       }
 
       if (subsResult.data) {
-        console.log('Subscriptions data count:', subsResult.data.length);
         const formatted = subsResult.data.map((s: any) => ({
           id: s.id,
           tenant_id: s.tenant_id,
@@ -93,14 +88,13 @@ export function SubscriptionsManager() {
           start_date: s.start_date,
           end_date: s.end_date,
           is_trial: s.is_trial,
-          plan_id: s.plan_id
+          plan_id: s.plan_id,
         }));
-        console.log('Formatted subscriptions:', formatted);
         setSubscriptions(formatted);
       }
 
       if (plansResult.data) {
-        setPlans(plansResult.data.map(p => ({ ...p, price: Number(p.price) })));
+        setPlans(plansResult.data.map((p) => ({ ...p, price: Number(p.price) })));
       }
     } catch (err) {
       console.error('Erro inesperado:', err);
@@ -108,39 +102,18 @@ export function SubscriptionsManager() {
     }
 
     setLoading(false);
-    console.log('=== FIM FETCH DATA ===');
   };
 
   const openEditDialog = (subscription: Subscription) => {
-    console.log('=== EDIT DIALOG DEBUG ===');
-    console.log('1. openEditDialog chamado');
-    console.log('2. Subscription recebida:', JSON.stringify(subscription, null, 2));
-    console.log('3. Estado atual - isDialogOpen:', isDialogOpen);
-    console.log('4. Estado atual - editingSubscription:', editingSubscription);
-    
-    try {
-      setEditingSubscription(subscription);
-      console.log('5. setEditingSubscription executado');
-      
-      const newForm = {
-        status: subscription.status,
-        end_date: subscription.end_date,
-        plan_id: subscription.plan_id || ''
-      };
-      console.log('6. Novo form:', newForm);
-      setEditForm(newForm);
-      console.log('7. setEditForm executado');
-      
-      setIsDialogOpen(true);
-      console.log('8. setIsDialogOpen(true) executado');
-      console.log('=== FIM DEBUG ===');
-    } catch (err) {
-      console.error('ERRO em openEditDialog:', err);
-    }
+    setEditingSubscription(subscription);
+    setEditForm({
+      status: subscription.status,
+      end_date: subscription.end_date,
+      plan_id: subscription.plan_id || '',
+    });
   };
 
   const closeDialog = () => {
-    console.log('closeDialog chamado');
     setIsDialogOpen(false);
     setEditingSubscription(null);
   };
@@ -266,14 +239,20 @@ export function SubscriptionsManager() {
   }
 
   return (
-    <>
+    <Dialog
+      open={isDialogOpen}
+      onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) setEditingSubscription(null);
+      }}
+    >
       <div className="stat-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <CreditCard className="text-primary" size={24} />
             <h3 className="font-display font-semibold text-lg">Gerenciar Assinaturas</h3>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchData}>
+          <Button variant="outline" size="sm" onClick={fetchData} type="button">
             <RefreshCw className="w-4 h-4 mr-2" />
             Atualizar
           </Button>
@@ -293,11 +272,14 @@ export function SubscriptionsManager() {
             </thead>
             <tbody>
               {subscriptions.map((sub) => (
-                <tr 
-                  key={sub.id} 
+                <tr
+                  key={sub.id}
                   className={`border-b border-border/50 hover:bg-muted/30 ${
-                    isExpired(sub.end_date) ? 'bg-destructive/5' : 
-                    isExpiringSoon(sub.end_date) ? 'bg-warning/5' : ''
+                    isExpired(sub.end_date)
+                      ? 'bg-destructive/5'
+                      : isExpiringSoon(sub.end_date)
+                        ? 'bg-warning/5'
+                        : ''
                   }`}
                 >
                   <td className="py-3 px-4">
@@ -309,17 +291,13 @@ export function SubscriptionsManager() {
                   <td className="py-3 px-4">
                     <div>
                       <p className="font-medium text-foreground">{sub.plan_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        R$ {sub.plan_price.toFixed(2)}
-                      </p>
+                      <p className="text-sm text-muted-foreground">R$ {sub.plan_price.toFixed(2)}</p>
                     </div>
                   </td>
                   <td className="py-3 px-4">
                     {getStatusBadge(sub.status)}
                     {sub.is_trial && (
-                      <span className="ml-2 px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">
-                        Trial
-                      </span>
+                      <span className="ml-2 px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">Trial</span>
                     )}
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">
@@ -327,28 +305,42 @@ export function SubscriptionsManager() {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <Calendar size={14} className={
-                        isExpired(sub.end_date) ? 'text-destructive' :
-                        isExpiringSoon(sub.end_date) ? 'text-warning' : 'text-muted-foreground'
-                      } />
-                      <span className={
-                        isExpired(sub.end_date) ? 'text-destructive font-medium' :
-                        isExpiringSoon(sub.end_date) ? 'text-warning font-medium' : 'text-muted-foreground'
-                      }>
+                      <Calendar
+                        size={14}
+                        className={
+                          isExpired(sub.end_date)
+                            ? 'text-destructive'
+                            : isExpiringSoon(sub.end_date)
+                              ? 'text-warning'
+                              : 'text-muted-foreground'
+                        }
+                      />
+                      <span
+                        className={
+                          isExpired(sub.end_date)
+                            ? 'text-destructive font-medium'
+                            : isExpiringSoon(sub.end_date)
+                              ? 'text-warning font-medium'
+                              : 'text-muted-foreground'
+                        }
+                      >
                         {format(new Date(sub.end_date), 'dd/MM/yyyy', { locale: ptBR })}
                       </span>
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => openEditDialog(sub)}
-                      className="gap-1"
-                    >
-                      <Pencil size={14} />
-                      Editar
-                    </Button>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        type="button"
+                        onClick={() => openEditDialog(sub)}
+                        className="gap-1"
+                      >
+                        <Pencil size={14} />
+                        Editar
+                      </Button>
+                    </DialogTrigger>
                   </td>
                 </tr>
               ))}
@@ -357,97 +349,83 @@ export function SubscriptionsManager() {
         </div>
 
         {subscriptions.length === 0 && (
-          <p className="text-center py-8 text-muted-foreground">
-            Nenhuma assinatura encontrada
-          </p>
+          <p className="text-center py-8 text-muted-foreground">Nenhuma assinatura encontrada</p>
         )}
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Editar Assinatura</DialogTitle>
-            <DialogDescription>
-              Altere o status, plano ou data de vencimento da assinatura
-            </DialogDescription>
-          </DialogHeader>
-          
-          {editingSubscription && (
-            <div className="space-y-4 py-4">
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="font-medium text-foreground">{editingSubscription.tenant_name}</p>
-                <p className="text-sm text-muted-foreground">
-                  Plano atual: {editingSubscription.plan_name}
-                </p>
-              </div>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Editar Assinatura</DialogTitle>
+          <DialogDescription>Altere o status, plano ou data de vencimento da assinatura</DialogDescription>
+        </DialogHeader>
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={editForm.status}
-                  onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="trial">Trial</SelectItem>
-                    <SelectItem value="expired">Expirado</SelectItem>
-                    <SelectItem value="cancelled">Cancelado</SelectItem>
-                    <SelectItem value="blocked">Bloqueado</SelectItem>
-                  </SelectContent>
-                </Select>
-                {(editForm.status === 'blocked' || editForm.status === 'cancelled') && (
-                  <p className="text-xs text-destructive flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    Isso bloqueará o acesso do usuário ao sistema
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="end_date">Data de Vencimento</Label>
-                <Input
-                  id="end_date"
-                  type="date"
-                  value={editForm.end_date}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, end_date: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="plan">Plano</Label>
-                <Select
-                  value={editForm.plan_id}
-                  onValueChange={(value) => setEditForm(prev => ({ ...prev, plan_id: value }))}
-                >
-                  <SelectTrigger id="plan">
-                    <SelectValue placeholder="Selecionar plano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plans.map((plan) => (
-                      <SelectItem key={plan.id} value={plan.id}>
-                        {plan.name} - R$ {plan.price.toFixed(2)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        {editingSubscription && (
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="font-medium text-foreground">{editingSubscription.tenant_name}</p>
+              <p className="text-sm text-muted-foreground">Plano atual: {editingSubscription.plan_name}</p>
             </div>
-          )}
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={closeDialog} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Salvar Alterações
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={editForm.status} onValueChange={(value) => setEditForm((prev) => ({ ...prev, status: value }))}>
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativo</SelectItem>
+                  <SelectItem value="trial">Trial</SelectItem>
+                  <SelectItem value="expired">Expirado</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                  <SelectItem value="blocked">Bloqueado</SelectItem>
+                </SelectContent>
+              </Select>
+              {(editForm.status === 'blocked' || editForm.status === 'cancelled') && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle size={12} />
+                  Isso bloqueará o acesso do usuário ao sistema
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="end_date">Data de Vencimento</Label>
+              <Input
+                id="end_date"
+                type="date"
+                value={editForm.end_date}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, end_date: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="plan">Plano</Label>
+              <Select value={editForm.plan_id} onValueChange={(value) => setEditForm((prev) => ({ ...prev, plan_id: value }))}>
+                <SelectTrigger id="plan">
+                  <SelectValue placeholder="Selecionar plano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>
+                      {plan.name} - R$ {plan.price.toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={closeDialog} disabled={saving} type="button">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={saving} type="button">
+            {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            Salvar Alterações
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
