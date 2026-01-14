@@ -78,9 +78,12 @@ export default function Admin() {
         user_id,
         full_name,
         email,
-        tenant:tenants(name)
+        tenant_id,
+        tenants(name)
       `)
       .limit(20);
+
+    console.log('Profiles data:', profilesData);
 
     if (profilesData) {
       const usersWithRoles = await Promise.all(
@@ -89,13 +92,13 @@ export default function Admin() {
             .from('user_roles')
             .select('role')
             .eq('user_id', p.user_id)
-            .single();
+            .maybeSingle();
 
           return {
             id: p.user_id,
             email: p.email,
             full_name: p.full_name,
-            tenant_name: p.tenant?.name || null,
+            tenant_name: p.tenants?.name || null,
             role: roleData?.role || 'user',
           };
         })
