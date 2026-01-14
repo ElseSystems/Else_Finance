@@ -18,8 +18,6 @@ import { Button } from '@/components/ui/button';
 
 interface SidebarProps {
   isAdmin?: boolean;
-  variant?: 'fixed' | 'drawer';
-  onNavigate?: () => void;
 }
 
 const menuItems = [
@@ -31,22 +29,22 @@ const menuItems = [
   { icon: Settings, label: 'Configurações', path: '/settings' },
 ];
 
-const adminItems = [{ icon: Shield, label: 'Painel Admin', path: '/admin' }];
+const adminItems = [
+  { icon: Shield, label: 'Painel Admin', path: '/admin' },
+];
 
-export function Sidebar({ isAdmin = false, variant = 'fixed', onNavigate }: SidebarProps) {
+export function Sidebar({ isAdmin = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const { signOut, profile } = useAuth();
 
   const allItems = isAdmin ? [...menuItems, ...adminItems] : menuItems;
-  const isDrawer = variant === 'drawer';
 
   return (
     <aside 
       className={cn(
-        'bg-sidebar transition-all duration-300 flex flex-col',
-        isDrawer ? 'w-full h-full' : 'fixed left-0 top-0 z-40 h-screen',
-        collapsed && !isDrawer ? 'w-20' : 'w-64'
+        'fixed left-0 top-0 z-40 h-screen bg-sidebar transition-all duration-300 flex flex-col',
+        collapsed ? 'w-20' : 'w-64'
       )}
     >
       {/* Logo */}
@@ -63,22 +61,20 @@ export function Sidebar({ isAdmin = false, variant = 'fixed', onNavigate }: Side
           </div>
         )}
         
-        {collapsed && !isDrawer && (
+        {collapsed && (
           <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center mx-auto">
             <span className="text-sidebar-primary-foreground font-bold text-lg">F</span>
           </div>
         )}
         
-        {!isDrawer && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-          >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </Button>
       </div>
 
       {/* Navigation */}
@@ -89,15 +85,14 @@ export function Sidebar({ isAdmin = false, variant = 'fixed', onNavigate }: Side
             <Link
               key={item.path}
               to={item.path}
-              onClick={onNavigate}
               className={cn(
                 'sidebar-item',
                 isActive && 'active',
-                collapsed && !isDrawer && 'justify-center px-3'
+                collapsed && 'justify-center px-3'
               )}
             >
               <item.icon size={20} />
-              {(!collapsed || isDrawer) && <span>{item.label}</span>}
+              {!collapsed && <span>{item.label}</span>}
             </Link>
           );
         })}
@@ -127,11 +122,11 @@ export function Sidebar({ isAdmin = false, variant = 'fixed', onNavigate }: Side
           onClick={signOut}
           className={cn(
             'sidebar-item w-full text-red-400 hover:bg-red-500/10 hover:text-red-400',
-            collapsed && !isDrawer && 'justify-center px-3'
+            collapsed && 'justify-center px-3'
           )}
         >
           <LogOut size={20} />
-          {(!collapsed || isDrawer) && <span>Sair</span>}
+          {!collapsed && <span>Sair</span>}
         </button>
       </div>
     </aside>

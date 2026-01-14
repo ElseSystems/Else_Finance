@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { Shield, Users, Building2, ArrowDownUp, Loader2, CreditCard, Package, Calendar, Plus, Edit, X, Check, AlertTriangle, FileText } from 'lucide-react';
+import { Shield, Users, Building2, ArrowDownUp, Loader2, CreditCard, Package, Calendar, Plus, Edit, X, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { RevenueChart } from '@/components/admin/RevenueChart';
-import { SubscriptionStats } from '@/components/admin/SubscriptionStats';
-import { PaymentHistory, PaymentRecord } from '@/components/admin/PaymentHistory';
-import { ReportsExport } from '@/components/admin/ReportsExport';
 
 interface AdminStats {
   totalUsers: number;
@@ -55,27 +51,6 @@ interface Subscription {
   plan?: Plan;
 }
 
-interface Payment {
-  id: string;
-  subscription_id: string | null;
-  tenant_id: string | null;
-  amount: number;
-  status: string;
-  payment_method: string | null;
-  paid_at: string | null;
-  created_at: string | null;
-  subscription?: {
-    tenant?: { name: string };
-    plan?: Plan;
-  } | null;
-}
-
-interface FinanceMetrics {
-  mrr: number;
-  arr: number;
-  churnRate: number;
-}
-
 interface TenantWithSubscription {
   id: string;
   name: string;
@@ -96,12 +71,6 @@ export default function Admin() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [tenants, setTenants] = useState<TenantWithSubscription[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [financeMetrics, setFinanceMetrics] = useState<FinanceMetrics>({ mrr: 0, arr: 0, churnRate: 0 });
-  const [revenueTrend, setRevenueTrend] = useState<any[]>([]);
-  const [companyFilter, setCompanyFilter] = useState('');
-  const [planFilter, setPlanFilter] = useState<'all' | string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | string>('all');
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('overview');
   const { toast } = useToast();
@@ -136,12 +105,6 @@ export default function Admin() {
       fetchAdminData();
     }
   }, [isAdminRole]);
-
-  useEffect(() => {
-    if (subscriptions.length > 0 || payments.length > 0) {
-      calculateFinanceMetrics();
-    }
-  }, [subscriptions, payments, plans]);
 
   const checkAdminRoleLocal = async () => {
     if (!user) return;
@@ -231,21 +194,6 @@ export default function Admin() {
       .order('end_date', { ascending: true });
 
     if (subsData) setSubscriptions(subsData as any);
-
-    const { data: paymentsData } = await supabase
-      .from('payments')
-      .select(`
-        *,
-        subscription:subscriptions(
-          *,
-          tenant:tenants(name),
-          plan:plans(name, price, duration_months)
-        )
-      `)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    if (paymentsData) setPayments(paymentsData as any);
 
     if (tenantsData && subsData) {
       const tenantsWithSubs = tenantsData.map((tenant) => ({
@@ -373,58 +321,6 @@ export default function Admin() {
     return { label: 'Ativo', color: 'bg-primary/10 text-primary' };
   };
 
-  const calculateFinanceMetrics = () => {
-    const activeSubs = subscriptions.filter((s) => s.status === 'active');
-    const mrr = activeSubs.reduce((acc, sub) => {
-      const plan = plans.find((p) => p.id === sub.plan_id);
-      if (!plan || !plan.duration_months) return acc;
-      return acc + plan.price / plan.duration_months;
-    }, 0);
-
-    const arr = mrr * 12;
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const cancelledLast30 = subscriptions.filter(
-      (s) => s.status === 'cancelled' && new Date(s.end_date) >= thirtyDaysAgo
-    );
-    const churnRate = activeSubs.length ? (cancelledLast30.length / activeSubs.length) * 100 : 0;
-
-    setFinanceMetrics({ mrr, arr, churnRate });
-    setRevenueTrend(buildRevenueTrend());
-  };
-
-  const buildRevenueTrend = () => {
-    const paid = payments.filter((p) => p.status === 'paid' && p.created_at);
-    const map = new Map<string, number>();
-    paid.forEach((p) => {
-      const date = new Date(p.created_at as string);
-      const key = `${date.getMonth() + 1}/${date.getFullYear()}`;
-      map.set(key, (map.get(key) || 0) + p.amount);
-    });
-
-    const sorted = Array.from(map.entries()).sort((a, b) => {
-      const [ma, ya] = a[0].split('/').map(Number);
-      const [mb, yb] = b[0].split('/').map(Number);
-      return ya === yb ? ma - mb : ya - yb;
-    });
-
-    return sorted.map(([month, total]) => ({ month, mrr: total }));
-  };
-
-  const filteredTenants = useMemo(() => {
-    return tenants.filter((tenant) => {
-      const matchesSearch = tenant.name.toLowerCase().includes(companyFilter.toLowerCase());
-      const matchesPlan =
-        planFilter === 'all' ||
-        tenant.subscription?.plan?.id === planFilter ||
-        tenant.subscription?.plan_id === planFilter;
-      const matchesStatus =
-        statusFilter === 'all' || tenant.subscription?.status === statusFilter;
-      return matchesSearch && matchesPlan && matchesStatus;
-    });
-  }, [tenants, companyFilter, planFilter, statusFilter]);
-
   const openEditPlan = (plan: Plan) => {
     setEditingPlan(plan);
     setPlanForm({
@@ -446,49 +342,6 @@ export default function Admin() {
       payment_method: 'pix',
     });
     setSubscriptionDialogOpen(true);
-  };
-
-  const downloadCsv = (csv: string, filename: string) => {
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportPaymentsCsv = () => {
-    const header = ['Empresa', 'Plano', 'Valor', 'Status', 'Forma', 'Pago em', 'Criado em'];
-    const rows = payments.map((p) => [
-      p.subscription?.tenant?.name || '',
-      p.subscription?.plan?.name || '',
-      p.amount,
-      p.status,
-      p.payment_method || '',
-      p.paid_at || '',
-      p.created_at || '',
-    ]);
-    const csv = [header, ...rows].map((r) => r.join(';')).join('\n');
-    downloadCsv(csv, 'pagamentos.csv');
-  };
-
-  const exportSubscriptionsCsv = () => {
-    const header = ['Empresa', 'Plano', 'Status', 'Início', 'Fim'];
-    const rows = subscriptions.map((s) => {
-      const plan = plans.find((p) => p.id === s.plan_id);
-      const tenant = tenants.find((t) => t.id === s.tenant_id);
-      return [
-        tenant?.name || '',
-        plan?.name || '',
-        s.status,
-        s.start_date,
-        s.end_date,
-      ];
-    });
-    const csv = [header, ...rows].map((r) => r.join(';')).join('\n');
-    downloadCsv(csv, 'assinaturas.csv');
   };
 
   if (authLoading || isAdminRole === null) {
@@ -516,13 +369,11 @@ export default function Admin() {
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 max-w-full overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="companies">Empresas</TabsTrigger>
           <TabsTrigger value="plans">Planos</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
-          <TabsTrigger value="payments">Pagamentos</TabsTrigger>
-          <TabsTrigger value="reports">Relatórios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -577,21 +428,6 @@ export default function Admin() {
             </div>
           </div>
 
-          <SubscriptionStats
-            mrr={financeMetrics.mrr}
-            arr={financeMetrics.arr}
-            churnRate={financeMetrics.churnRate}
-            activeSubscriptions={stats.activeSubscriptions}
-          />
-
-          <div className="stat-card">
-            <div className="flex items-center gap-2 mb-4">
-              <ArrowDownUp className="text-primary" size={20} />
-              <h3 className="font-display font-semibold text-lg">Evolução de Receita</h3>
-            </div>
-            <RevenueChart data={revenueTrend} />
-          </div>
-
           {/* Expiring Soon */}
           <div className="stat-card">
             <div className="flex items-center gap-2 mb-4">
@@ -635,40 +471,6 @@ export default function Admin() {
         <TabsContent value="companies" className="space-y-6">
           <div className="stat-card">
             <h3 className="font-display font-semibold text-lg mb-4">Empresas Cadastradas</h3>
-
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
-              <Input
-                placeholder="Buscar por nome da empresa"
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-                className="md:max-w-xs"
-              />
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Select value={planFilter} onValueChange={(v) => setPlanFilter(v)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Plano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os planos</SelectItem>
-                    {plans.map((plan) => (
-                      <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="expired">Expirado</SelectItem>
-                    <SelectItem value="cancelled">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             
             {loading ? (
               <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
@@ -686,7 +488,7 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTenants.map((tenant) => {
+                    {tenants.map((tenant) => {
                       const status = getSubscriptionStatus(tenant.subscription);
                       return (
                         <tr key={tenant.id} className="border-b border-border/50 hover:bg-muted/30">
@@ -737,36 +539,6 @@ export default function Admin() {
                 </table>
               </div>
             )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="payments" className="space-y-6">
-          <div className="stat-card">
-            <div className="flex items-center gap-2 mb-4">
-              <CreditCard className="text-primary" size={20} />
-              <h3 className="font-display font-semibold text-lg">Histórico de Pagamentos</h3>
-            </div>
-            {loading ? (
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-            ) : (
-              <PaymentHistory payments={payments as PaymentRecord[]} />
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-6">
-          <div className="stat-card space-y-4">
-            <div className="flex items-center gap-2">
-              <FileText className="text-primary" size={20} />
-              <h3 className="font-display font-semibold text-lg">Relatórios e Exportação</h3>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Exporte pagamentos e assinaturas para CSV e analise os dados fora do sistema.
-            </p>
-            <ReportsExport
-              onExportPayments={exportPaymentsCsv}
-              onExportSubscriptions={exportSubscriptionsCsv}
-            />
           </div>
         </TabsContent>
 
