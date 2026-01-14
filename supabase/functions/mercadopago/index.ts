@@ -52,7 +52,29 @@ interface CheckExpiringRequest {
   action: "check_expiring";
 }
 
-type RequestBody = CreatePlanRequest | UpdatePlanRequest | CreateSubscriptionAction | CancelSubscriptionRequest | CheckExpiringRequest;
+interface CreatePaymentRequest {
+  action: "create_payment";
+  amount: number;
+  description: string;
+  payment_method: "credit_card" | "pix" | "boleto";
+  subscription_id?: string;
+  tenant_id?: string;
+  payer_email?: string;
+}
+
+interface ChargeSubscriptionRequest {
+  action: "charge_subscription";
+  subscription_id: string;
+}
+
+type RequestBody =
+  | CreatePlanRequest
+  | UpdatePlanRequest
+  | CreateSubscriptionAction
+  | CancelSubscriptionRequest
+  | CheckExpiringRequest
+  | CreatePaymentRequest
+  | ChargeSubscriptionRequest;
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -245,6 +267,184 @@ const handler = async (req: Request): Promise<Response> => {
             success: true,
             expiring_count: expiringSubscriptions?.length || 0,
             subscriptions: expiringSubscriptions,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "create_payment": {
+        const {
+          amount,
+          description,
+          payment_method,
+          subscription_id,
+          tenant_id,
+          payer_email,
+        } = body;
+
+        if (!amount || !description) {
+          throw new Error("amount e description são obrigatórios");
+        }
+
+        // Create a checkout preference to allow the user to pay
+        const prefResponse = await fetch(
+          "https://api.mercadopago.com/checkout/preferences",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              items: [
+                {
+                  title: description,
+                  quantity: 1,
+                  currency_id: "BRL",
+                  unit_price: amount,
+                },
+              ],
+              payer: payer_email ? { email: payer_email } : undefined,
+              payment_methods: {
+                excluded_payment_types:
+                  payment_method === "credit_card"
+                    ? []
+                    : payment_method === "pix"
+                      ? [{ id: "credit_card" }]
+                      : [],
+              },
+              back_urls: {
+                success: `${req.headers.get("origin")}/settings`,
+                failure: `${req.headers.get("origin")}/settings`,
+                pending: `${req.headers.get("origin")}/settings`,
+              },
+              auto_return: "approved",
+              metadata: {
+                subscription_id,
+                tenant_id,
+              },
+            }),
+          }
+        );
+
+        const prefData = await prefResponse.json();
+
+        if (!prefResponse.ok) {
+          console.error("Mercado Pago preference error:", prefData);
+          throw new Error(prefData.message || "Erro ao criar pagamento");
+        }
+
+        // Save payment intent to database (status pending)
+        let resolvedTenantId = tenant_id || null;
+        if (subscription_id && !resolvedTenantId) {
+          const { data: subRecord } = await supabase
+            .from("subscriptions")
+            .select("tenant_id")
+            .eq("id", subscription_id)
+            .single();
+          resolvedTenantId = subRecord?.tenant_id || null;
+        }
+
+        if (subscription_id || resolvedTenantId) {
+          await supabase.from("payments").insert({
+            subscription_id,
+            tenant_id: resolvedTenantId,
+            amount,
+            status: "pending",
+            payment_method,
+            mercadopago_preference_id: prefData.id,
+          });
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            init_point: prefData.init_point,
+            sandbox_init_point: prefData.sandbox_init_point,
+            preference_id: prefData.id,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "charge_subscription": {
+        const { subscription_id } = body;
+        if (!subscription_id) throw new Error("subscription_id é obrigatório");
+
+        // Load subscription with plan and tenant
+        const { data: subscription, error: subError } = await supabase
+          .from("subscriptions")
+          .select("*, plan:plans(*), tenant:tenants(*)")
+          .eq("id", subscription_id)
+          .single();
+
+        if (subError || !subscription) throw new Error("Assinatura não encontrada");
+
+        const plan = (subscription as any).plan;
+        const amount = plan?.price;
+        if (!amount) throw new Error("Plano sem preço configurado");
+
+        // Create payment intent
+        const prefResponse = await fetch(
+          "https://api.mercadopago.com/checkout/preferences",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              items: [
+                {
+                  title: `${plan.name} - Renovação`,
+                  quantity: 1,
+                  currency_id: "BRL",
+                  unit_price: amount,
+                },
+              ],
+              back_urls: {
+                success: `${req.headers.get("origin")}/settings`,
+                failure: `${req.headers.get("origin")}/settings`,
+                pending: `${req.headers.get("origin")}/settings`,
+              },
+              auto_return: "approved",
+              metadata: {
+                subscription_id,
+                tenant_id: subscription.tenant_id,
+              },
+            }),
+          }
+        );
+
+        const prefData = await prefResponse.json();
+        if (!prefResponse.ok) {
+          console.error("Mercado Pago preference error:", prefData);
+          throw new Error(prefData.message || "Erro ao criar cobrança");
+        }
+
+        await supabase.from("payments").insert({
+          subscription_id,
+          tenant_id: subscription.tenant_id,
+          amount,
+          status: "pending",
+          payment_method: "credit_card",
+          mercadopago_preference_id: prefData.id,
+        });
+
+        // Optional: update next billing date
+        await supabase
+          .from("subscriptions")
+          .update({
+            next_billing_date: subscription.end_date,
+          })
+          .eq("id", subscription_id);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            init_point: prefData.init_point,
+            sandbox_init_point: prefData.sandbox_init_point,
+            preference_id: prefData.id,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
