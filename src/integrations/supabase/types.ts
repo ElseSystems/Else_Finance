@@ -106,6 +106,53 @@ export type Database = {
           },
         ]
       }
+      payment_methods: {
+        Row: {
+          card_brand: string | null
+          card_last_four: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          mercadopago_card_id: string | null
+          mercadopago_customer_id: string | null
+          tenant_id: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          card_brand?: string | null
+          card_last_four?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          mercadopago_card_id?: string | null
+          mercadopago_customer_id?: string | null
+          tenant_id: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          card_brand?: string | null
+          card_last_four?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          mercadopago_card_id?: string | null
+          mercadopago_customer_id?: string | null
+          tenant_id?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           created_at: string
@@ -171,9 +218,12 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          amount_due: number | null
           created_at: string
           end_date: string
           id: string
+          is_trial: boolean | null
+          last_payment_date: string | null
           mercadopago_preapproval_id: string | null
           mercadopago_subscription_id: string | null
           notified_expiring: boolean | null
@@ -182,12 +232,16 @@ export type Database = {
           start_date: string
           status: string
           tenant_id: string
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
+          amount_due?: number | null
           created_at?: string
           end_date: string
           id?: string
+          is_trial?: boolean | null
+          last_payment_date?: string | null
           mercadopago_preapproval_id?: string | null
           mercadopago_subscription_id?: string | null
           notified_expiring?: boolean | null
@@ -196,12 +250,16 @@ export type Database = {
           start_date?: string
           status?: string
           tenant_id: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
+          amount_due?: number | null
           created_at?: string
           end_date?: string
           id?: string
+          is_trial?: boolean | null
+          last_payment_date?: string | null
           mercadopago_preapproval_id?: string | null
           mercadopago_subscription_id?: string | null
           notified_expiring?: boolean | null
@@ -210,6 +268,7 @@ export type Database = {
           start_date?: string
           status?: string
           tenant_id?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -231,23 +290,32 @@ export type Database = {
       }
       tenants: {
         Row: {
+          block_reason: string | null
+          blocked_at: string | null
           created_at: string
           created_by: string | null
           id: string
+          is_blocked: boolean | null
           name: string
           updated_at: string
         }
         Insert: {
+          block_reason?: string | null
+          blocked_at?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          is_blocked?: boolean | null
           name: string
           updated_at?: string
         }
         Update: {
+          block_reason?: string | null
+          blocked_at?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          is_blocked?: boolean | null
           name?: string
           updated_at?: string
         }
@@ -381,6 +449,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_tenant_access: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          amount_due: number
+          block_reason: string
+          can_access: boolean
+          is_payment_due: boolean
+          subscription_status: string
+        }[]
+      }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

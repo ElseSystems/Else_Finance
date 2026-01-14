@@ -60,7 +60,7 @@ interface TenantWithSubscription {
 
 export default function Admin() {
   const { profile, user, loading: authLoading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isAdminRole, setIsAdminRole] = useState<boolean | null>(null);
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalTenants: 0,
@@ -96,17 +96,17 @@ export default function Admin() {
 
   useEffect(() => {
     if (user) {
-      checkAdminRole();
+      checkAdminRoleLocal();
     }
   }, [user]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdminRole) {
       fetchAdminData();
     }
-  }, [isAdmin]);
+  }, [isAdminRole]);
 
-  const checkAdminRole = async () => {
+  const checkAdminRoleLocal = async () => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -116,7 +116,7 @@ export default function Admin() {
       .eq('role', 'admin')
       .single();
 
-    setIsAdmin(!error && data?.role === 'admin');
+    setIsAdminRole(!error && data?.role === 'admin');
   };
 
   const fetchAdminData = async () => {
@@ -344,9 +344,9 @@ export default function Admin() {
     setSubscriptionDialogOpen(true);
   };
 
-  if (authLoading || isAdmin === null) {
+  if (authLoading || isAdminRole === null) {
     return (
-      <Layout isAdmin>
+      <Layout>
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -354,12 +354,12 @@ export default function Admin() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAdminRole) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return (
-    <Layout isAdmin>
+    <Layout>
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <Shield className="text-primary" size={32} />
