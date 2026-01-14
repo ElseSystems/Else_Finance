@@ -106,6 +106,39 @@ export type Database = {
           },
         ]
       }
+      plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_months: number
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_months?: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_months?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -135,6 +168,66 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          mercadopago_preapproval_id: string | null
+          mercadopago_subscription_id: string | null
+          notified_expiring: boolean | null
+          payment_method: string | null
+          plan_id: string
+          start_date: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          mercadopago_preapproval_id?: string | null
+          mercadopago_subscription_id?: string | null
+          notified_expiring?: boolean | null
+          payment_method?: string | null
+          plan_id: string
+          start_date?: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          mercadopago_preapproval_id?: string | null
+          mercadopago_subscription_id?: string | null
+          notified_expiring?: boolean | null
+          payment_method?: string | null
+          plan_id?: string
+          start_date?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tenants: {
         Row: {
