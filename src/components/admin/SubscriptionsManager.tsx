@@ -105,17 +105,35 @@ export function SubscriptionsManager() {
   };
 
   const openEditDialog = (subscription: Subscription) => {
-    console.log('Abrindo edição para:', subscription);
-    setEditingSubscription(subscription);
-    setEditForm({
-      status: subscription.status,
-      end_date: subscription.end_date,
-      plan_id: subscription.plan_id || ''
-    });
-    setIsDialogOpen(true);
+    console.log('=== EDIT DIALOG DEBUG ===');
+    console.log('1. openEditDialog chamado');
+    console.log('2. Subscription recebida:', JSON.stringify(subscription, null, 2));
+    console.log('3. Estado atual - isDialogOpen:', isDialogOpen);
+    console.log('4. Estado atual - editingSubscription:', editingSubscription);
+    
+    try {
+      setEditingSubscription(subscription);
+      console.log('5. setEditingSubscription executado');
+      
+      const newForm = {
+        status: subscription.status,
+        end_date: subscription.end_date,
+        plan_id: subscription.plan_id || ''
+      };
+      console.log('6. Novo form:', newForm);
+      setEditForm(newForm);
+      console.log('7. setEditForm executado');
+      
+      setIsDialogOpen(true);
+      console.log('8. setIsDialogOpen(true) executado');
+      console.log('=== FIM DEBUG ===');
+    } catch (err) {
+      console.error('ERRO em openEditDialog:', err);
+    }
   };
 
   const closeDialog = () => {
+    console.log('closeDialog chamado');
     setIsDialogOpen(false);
     setEditingSubscription(null);
   };
