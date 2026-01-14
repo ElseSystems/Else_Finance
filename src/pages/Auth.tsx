@@ -159,12 +159,6 @@ export default function Auth() {
             </button>
           </p>
 
-          <div className="mt-8 p-4 rounded-xl bg-muted/50 border border-border">
-            <p className="text-sm text-muted-foreground text-center">
-              <strong>Conta de teste:</strong><br />
-              admin@financeapp.com / admin123
-            </p>
-          </div>
         </div>
       </div>
 
