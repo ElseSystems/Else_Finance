@@ -2,8 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useTenantAccess } from "@/hooks/useTenantAccess";
+import { BlockedAccess } from "@/components/BlockedAccess";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -18,10 +20,12 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, skipAccessCheck = false }: { children: React.ReactNode; skipAccessCheck?: boolean }) {
   const { user, loading } = useAuth();
+  const tenantAccess = useTenantAccess();
+  const location = useLocation();
 
-  if (loading) {
+  if (loading || tenantAccess.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -31,6 +35,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Não verifica acesso para a rota admin
+  if (!skipAccessCheck && !tenantAccess.canAccess) {
+    return <BlockedAccess reason={tenantAccess.blockReason} isPaymentDue={tenantAccess.isPaymentDue} />;
   }
 
   return <>{children}</>;
@@ -92,7 +101,7 @@ function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute skipAccessCheck>
             <Admin />
           </ProtectedRoute>
         }

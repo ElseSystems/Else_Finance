@@ -20,6 +20,7 @@ interface Subscription {
   start_date: string;
   end_date: string;
   is_trial: boolean;
+  plan_id: string;
 }
 
 interface Plan {
@@ -93,7 +94,7 @@ export function SubscriptionsManager() {
     setEditForm({
       status: subscription.status,
       end_date: subscription.end_date,
-      plan_id: (subscription as any).plan_id || ''
+      plan_id: subscription.plan_id || ''
     });
   };
 
@@ -102,7 +103,8 @@ export function SubscriptionsManager() {
     
     setSaving(true);
     
-    const { error } = await supabase
+    // Atualiza a assinatura
+    const { error: subError } = await supabase
       .from('subscriptions')
       .update({
         status: editForm.status,
@@ -111,9 +113,27 @@ export function SubscriptionsManager() {
       })
       .eq('id', editingSubscription.id);
 
-    if (error) {
+    if (subError) {
       toast.error('Erro ao atualizar assinatura');
-      console.error(error);
+      console.error(subError);
+      setSaving(false);
+      return;
+    }
+
+    // Atualiza o bloqueio do tenant baseado no status
+    const isBlocked = editForm.status === 'blocked' || editForm.status === 'cancelled';
+    const { error: tenantError } = await supabase
+      .from('tenants')
+      .update({
+        is_blocked: isBlocked,
+        blocked_at: isBlocked ? new Date().toISOString() : null,
+        block_reason: isBlocked ? `Status alterado para ${editForm.status}` : null
+      })
+      .eq('id', editingSubscription.tenant_id);
+
+    if (tenantError) {
+      toast.error('Erro ao atualizar status do tenant');
+      console.error(tenantError);
     } else {
       toast.success('Assinatura atualizada com sucesso!');
       setEditingSubscription(null);
@@ -296,6 +316,11 @@ export function SubscriptionsManager() {
                     <SelectItem value="blocked">Bloqueado</SelectItem>
                   </SelectContent>
                 </Select>
+                {(editForm.status === 'blocked' || editForm.status === 'cancelled') && (
+                  <p className="text-xs text-destructive">
+                    ⚠️ Isso bloqueará o acesso do usuário ao sistema
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
