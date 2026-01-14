@@ -143,20 +143,24 @@ export default function Admin() {
     subscriptionId: string | null,
     planId: string,
     endDate: Date,
-    status: string
+    status: string,
+    tenantName: string
   ) => {
     try {
       const isBlocked = status === 'blocked';
-      
-      // Update tenant blocked status
-      await supabase
+
+      // Update tenant (name + blocked status)
+      const { error: tenantError } = await supabase
         .from('tenants')
-        .update({ 
+        .update({
+          name: tenantName,
           is_blocked: isBlocked,
           blocked_at: isBlocked ? new Date().toISOString() : null,
-          block_reason: isBlocked ? 'Bloqueado pelo administrador' : null
+          block_reason: isBlocked ? 'Bloqueado pelo administrador' : null,
         })
         .eq('id', tenantId);
+
+      if (tenantError) throw tenantError;
 
       const subscriptionData = {
         plan_id: planId,
@@ -165,27 +169,29 @@ export default function Admin() {
       };
 
       if (subscriptionId) {
-        // Update existing subscription
-        await supabase
+        const { error: subError } = await supabase
           .from('subscriptions')
           .update(subscriptionData)
           .eq('id', subscriptionId);
+
+        if (subError) throw subError;
       } else {
-        // Create new subscription
-        await supabase
+        const { error: subError } = await supabase
           .from('subscriptions')
           .insert({
             ...subscriptionData,
             tenant_id: tenantId,
             start_date: new Date().toISOString().split('T')[0],
           });
+
+        if (subError) throw subError;
       }
 
-      toast.success('Assinatura atualizada com sucesso!');
+      toast.success('Cadastro atualizado com sucesso!');
       fetchAdminData();
     } catch (error) {
       console.error('Error saving subscription:', error);
-      toast.error('Erro ao salvar assinatura');
+      toast.error('Erro ao salvar alterações');
     }
   };
 

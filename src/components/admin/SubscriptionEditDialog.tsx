@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
@@ -47,7 +48,14 @@ interface SubscriptionEditDialogProps {
   onOpenChange: (open: boolean) => void;
   tenant: TenantWithSubscription | null;
   plans: Plan[];
-  onSave: (tenantId: string, subscriptionId: string | null, planId: string, endDate: Date, status: string) => Promise<void>;
+  onSave: (
+    tenantId: string,
+    subscriptionId: string | null,
+    planId: string,
+    endDate: Date,
+    status: string,
+    tenantName: string
+  ) => Promise<void>;
 }
 
 export function SubscriptionEditDialog({
@@ -57,6 +65,7 @@ export function SubscriptionEditDialog({
   plans,
   onSave,
 }: SubscriptionEditDialogProps) {
+  const [tenantName, setTenantName] = useState<string>('');
   const [selectedPlan, setSelectedPlan] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedStatus, setSelectedStatus] = useState<string>('active');
@@ -65,6 +74,7 @@ export function SubscriptionEditDialog({
   // Reset form when tenant changes or dialog opens
   useEffect(() => {
     if (tenant && open) {
+      setTenantName(tenant.name || '');
       setSelectedPlan(tenant.plan_id || plans[0]?.id || '');
       setSelectedDate(tenant.end_date ? new Date(tenant.end_date) : new Date());
       setSelectedStatus(tenant.is_blocked ? 'blocked' : (tenant.status || 'active'));
@@ -72,11 +82,18 @@ export function SubscriptionEditDialog({
   }, [tenant, open, plans]);
 
   const handleSave = async () => {
-    if (!tenant || !selectedPlan || !selectedDate) return;
-    
+    if (!tenant || !tenantName.trim() || !selectedPlan || !selectedDate) return;
+
     setSaving(true);
     try {
-      await onSave(tenant.id, tenant.subscription_id, selectedPlan, selectedDate, selectedStatus);
+      await onSave(
+        tenant.id,
+        tenant.subscription_id,
+        selectedPlan,
+        selectedDate,
+        selectedStatus,
+        tenantName.trim()
+      );
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -93,6 +110,15 @@ export function SubscriptionEditDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Empresa/Pessoa</label>
+            <Input
+              value={tenantName}
+              onChange={(e) => setTenantName(e.target.value)}
+              placeholder="Nome da empresa ou pessoa"
+            />
+          </div>
+
           <div className="space-y-2">
             <label className="text-sm font-medium">Plano</label>
             <Select value={selectedPlan} onValueChange={setSelectedPlan}>
