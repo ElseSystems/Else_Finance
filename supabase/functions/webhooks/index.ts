@@ -98,18 +98,18 @@ serve(async (req: Request): Promise<Response> => {
           })
           .eq("mercadopago_payment_id", paymentId);
       } else {
-        await supabase.from("payments").insert({
-          mercadopago_payment_id: paymentId,
-          mercadopago_preference_id: mpData.metadata?.preference_id || null,
-          subscription_id: subscriptionId,
-          tenant_id: tenantId,
-          amount,
-          status: mappedStatus,
-          status_detail: mpData.status_detail || null,
-          payment_method,
-          paid_at: paidAt,
-          failed_at: failedAt,
-        });
+      await supabase.from("payments").insert({
+        mercadopago_payment_id: paymentId,
+        mercadopago_preference_id: mpData.metadata?.preference_id || null,
+        subscription_id: subscriptionId,
+        tenant_id: tenantId,
+        amount,
+        status: mappedStatus,
+        status_detail: mpData.status_detail || null,
+        payment_method: paymentMethod,
+        paid_at: paidAt,
+        failed_at: failedAt,
+      });
       }
 
       // If paid, update subscription dates and status

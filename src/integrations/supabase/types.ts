@@ -153,6 +153,78 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          failed_at: string | null
+          fee_amount: number | null
+          id: string
+          invoice_url: string | null
+          mercadopago_payment_id: string | null
+          mercadopago_preference_id: string | null
+          net_amount: number | null
+          paid_at: string | null
+          payment_method: string | null
+          status: string
+          status_detail: string | null
+          subscription_id: string | null
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          failed_at?: string | null
+          fee_amount?: number | null
+          id?: string
+          invoice_url?: string | null
+          mercadopago_payment_id?: string | null
+          mercadopago_preference_id?: string | null
+          net_amount?: number | null
+          paid_at?: string | null
+          payment_method?: string | null
+          status?: string
+          status_detail?: string | null
+          subscription_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          failed_at?: string | null
+          fee_amount?: number | null
+          id?: string
+          invoice_url?: string | null
+          mercadopago_payment_id?: string | null
+          mercadopago_preference_id?: string | null
+          net_amount?: number | null
+          paid_at?: string | null
+          payment_method?: string | null
+          status?: string
+          status_detail?: string | null
+          subscription_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           created_at: string
