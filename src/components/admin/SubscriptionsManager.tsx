@@ -48,6 +48,7 @@ export function SubscriptionsManager() {
   }, []);
 
   const fetchData = async () => {
+    console.log('=== FETCH DATA DEBUG ===');
     setLoading(true);
     setError(null);
     
@@ -70,6 +71,9 @@ export function SubscriptionsManager() {
         supabase.from('plans').select('id, name, price').eq('is_active', true)
       ]);
 
+      console.log('Subscriptions result:', subsResult);
+      console.log('Plans result:', plansResult);
+
       if (subsResult.error) {
         console.error('Erro ao buscar assinaturas:', subsResult.error);
         setError('Erro ao carregar assinaturas: ' + subsResult.error.message);
@@ -78,6 +82,7 @@ export function SubscriptionsManager() {
       }
 
       if (subsResult.data) {
+        console.log('Subscriptions data count:', subsResult.data.length);
         const formatted = subsResult.data.map((s: any) => ({
           id: s.id,
           tenant_id: s.tenant_id,
@@ -90,6 +95,7 @@ export function SubscriptionsManager() {
           is_trial: s.is_trial,
           plan_id: s.plan_id
         }));
+        console.log('Formatted subscriptions:', formatted);
         setSubscriptions(formatted);
       }
 
@@ -102,6 +108,7 @@ export function SubscriptionsManager() {
     }
 
     setLoading(false);
+    console.log('=== FIM FETCH DATA ===');
   };
 
   const openEditDialog = (subscription: Subscription) => {
