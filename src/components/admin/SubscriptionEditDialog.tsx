@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
@@ -62,14 +62,14 @@ export function SubscriptionEditDialog({
   const [selectedStatus, setSelectedStatus] = useState<string>('active');
   const [saving, setSaving] = useState(false);
 
-  // Reset form when tenant changes
-  useState(() => {
-    if (tenant) {
+  // Reset form when tenant changes or dialog opens
+  useEffect(() => {
+    if (tenant && open) {
       setSelectedPlan(tenant.plan_id || plans[0]?.id || '');
       setSelectedDate(tenant.end_date ? new Date(tenant.end_date) : new Date());
-      setSelectedStatus(tenant.status || 'active');
+      setSelectedStatus(tenant.is_blocked ? 'blocked' : (tenant.status || 'active'));
     }
-  });
+  }, [tenant, open, plans]);
 
   const handleSave = async () => {
     if (!tenant || !selectedPlan || !selectedDate) return;
